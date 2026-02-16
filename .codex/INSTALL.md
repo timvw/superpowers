@@ -8,9 +8,9 @@ Enable superpowers skills in Codex via native skill discovery. Just clone and sy
 
 ## Installation
 
-1. **Clone the superpowers repository:**
+1. **Clone the superpowers repository (timvw fork):**
    ```bash
-   git clone https://github.com/obra/superpowers.git ~/.codex/superpowers
+   git clone -b feat/use-wt-tool https://github.com/timvw/superpowers.git ~/.codex/superpowers
    ```
 
 2. **Create the skills symlink:**

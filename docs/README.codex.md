@@ -7,7 +7,7 @@ Guide for using Superpowers with OpenAI Codex via native skill discovery.
 Tell Codex:
 
 ```
-Fetch and follow instructions from https://raw.githubusercontent.com/obra/superpowers/refs/heads/main/.codex/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/timvw/superpowers/refs/heads/feat/use-wt-tool/.codex/INSTALL.md
 ```
 
 ## Manual Installation
@@ -21,7 +21,7 @@ Fetch and follow instructions from https://raw.githubusercontent.com/obra/superp
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/obra/superpowers.git ~/.codex/superpowers
+   git clone -b feat/use-wt-tool https://github.com/timvw/superpowers.git ~/.codex/superpowers
    ```
 
 2. Create the skills symlink:
@@ -116,5 +116,6 @@ Junctions normally work without special permissions. If creation fails, try runn
 
 ## Getting Help
 
-- Report issues: https://github.com/obra/superpowers/issues
-- Main documentation: https://github.com/obra/superpowers
+- Fork issues: https://github.com/timvw/superpowers/issues
+- Upstream issues: https://github.com/obra/superpowers/issues
+- Main documentation: https://github.com/timvw/superpowers

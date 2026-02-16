@@ -26,32 +26,37 @@ Thanks!
 
 ## Installation
 
-**Note:** Installation differs by platform. Claude Code has a built-in plugin system. Codex and OpenCode require manual setup.
+**Note:** This is a fork of [obra/superpowers](https://github.com/obra/superpowers) with enhanced git worktree management using [`wt`](https://github.com/timvw/wt). Installation differs by platform.
 
-### Claude Code (via Plugin Marketplace)
+### Prerequisites
 
-In Claude Code, register the marketplace first:
-
-```bash
-/plugin marketplace add obra/superpowers-marketplace
-```
-
-Then install the plugin from this marketplace:
+Install the `wt` CLI tool (used by the `using-git-worktrees` skill):
 
 ```bash
-/plugin install superpowers@superpowers-marketplace
+brew install timvw/tap/wt
+wt init    # configure shell integration
 ```
 
-### Verify Installation
+See [github.com/timvw/wt](https://github.com/timvw/wt) for other installation methods.
 
-Start a new session and ask Claude to help with something that would trigger a skill (e.g., "help me plan this feature" or "let's debug this issue"). Claude should automatically invoke the relevant superpowers skill.
+### Claude Code
+
+```bash
+git clone -b feat/use-wt-tool https://github.com/timvw/superpowers.git ~/.config/superpowers
+```
+
+Then in Claude Code:
+
+```bash
+/plugin add ~/.config/superpowers
+```
 
 ### Codex
 
 Tell Codex:
 
 ```
-Fetch and follow instructions from https://raw.githubusercontent.com/obra/superpowers/refs/heads/main/.codex/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/timvw/superpowers/refs/heads/feat/use-wt-tool/.codex/INSTALL.md
 ```
 
 **Detailed docs:** [docs/README.codex.md](docs/README.codex.md)
@@ -61,10 +66,14 @@ Fetch and follow instructions from https://raw.githubusercontent.com/obra/superp
 Tell OpenCode:
 
 ```
-Fetch and follow instructions from https://raw.githubusercontent.com/obra/superpowers/refs/heads/main/.opencode/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/timvw/superpowers/refs/heads/feat/use-wt-tool/.opencode/INSTALL.md
 ```
 
 **Detailed docs:** [docs/README.opencode.md](docs/README.opencode.md)
+
+### Verify Installation
+
+Start a new session and ask your agent to help with something that would trigger a skill (e.g., "help me plan this feature" or "let's debug this issue"). The agent should automatically invoke the relevant superpowers skill.
 
 ## The Basic Workflow
 
@@ -132,10 +141,17 @@ See `skills/writing-skills/SKILL.md` for the complete guide.
 
 ## Updating
 
-Skills update automatically when you update the plugin:
+Pull the latest changes from the fork:
 
 ```bash
-/plugin update superpowers
+# OpenCode
+cd ~/.config/opencode/superpowers && git pull
+
+# Codex
+cd ~/.codex/superpowers && git pull
+
+# Claude Code
+cd ~/.config/superpowers && git pull
 ```
 
 ## License
@@ -144,5 +160,6 @@ MIT License - see LICENSE file for details
 
 ## Support
 
-- **Issues**: https://github.com/obra/superpowers/issues
-- **Marketplace**: https://github.com/obra/superpowers-marketplace
+- **Fork issues**: https://github.com/timvw/superpowers/issues
+- **Upstream issues**: https://github.com/obra/superpowers/issues
+- **wt tool**: https://github.com/timvw/wt
