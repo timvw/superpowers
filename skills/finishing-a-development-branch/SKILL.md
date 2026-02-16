@@ -137,14 +137,18 @@ Then: Cleanup worktree (Step 5)
 
 **For Options 1, 2, 4:**
 
-Check if in worktree:
+Check if in worktree and remove:
 ```bash
-git worktree list | grep $(git branch --show-current)
+wt list
+wt remove <branch>
 ```
 
-If yes:
+Use `wt rm -f <branch>` if the worktree has uncommitted changes (Option 4 discard).
+
+For batch cleanup of worktrees with merged branches:
 ```bash
-git worktree remove <worktree-path>
+wt cleanup --dry-run   # preview first
+wt cleanup             # remove merged-branch worktrees
 ```
 
 **For Option 3:** Keep worktree.

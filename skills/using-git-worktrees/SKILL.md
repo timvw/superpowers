@@ -1,6 +1,6 @@
 ---
 name: using-git-worktrees
-description: Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification
+description: Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees using the wt CLI tool
 ---
 
 # Using Git Worktrees
@@ -9,120 +9,166 @@ description: Use when starting feature work that needs isolation from current wo
 
 Git worktrees create isolated workspaces sharing the same repository, allowing work on multiple branches simultaneously without switching.
 
-**Core principle:** Systematic directory selection + safety verification = reliable isolation.
+This skill uses [`wt`](https://github.com/timvw/wt), a Git worktree manager that handles placement, shell integration, and multi-repo coordination.
+
+**Core principle:** Use `wt` for all worktree operations. It handles directory placement, duplicate prevention, and auto-cd.
 
 **Announce at start:** "I'm using the using-git-worktrees skill to set up an isolated workspace."
 
-## Directory Selection Process
+## Prerequisites
 
-Follow this priority order:
-
-### 1. Check Existing Directories
+`wt` must be installed with shell integration configured:
 
 ```bash
-# Check in priority order
-ls -d .worktrees 2>/dev/null     # Preferred (hidden)
-ls -d worktrees 2>/dev/null      # Alternative
+# Install
+brew install timvw/tap/wt
+
+# Configure shell integration (enables auto-cd and tab completion)
+wt init
 ```
 
-**If found:** Use that directory. If both exist, `.worktrees` wins.
-
-### 2. Check CLAUDE.md
+Verify configuration:
 
 ```bash
-grep -i "worktree.*director" CLAUDE.md 2>/dev/null
+wt info
 ```
 
-**If preference specified:** Use it without asking.
+This shows the active strategy, pattern, root directory, and available variables.
 
-### 3. Ask User
-
-If no directory exists and no CLAUDE.md preference:
-
-```
-No worktree directory found. Where should I create worktrees?
-
-1. .worktrees/ (project-local, hidden)
-2. ~/.config/superpowers/worktrees/<project-name>/ (global location)
-
-Which would you prefer?
-```
-
-## Safety Verification
-
-### For Project-Local Directories (.worktrees or worktrees)
-
-**MUST verify directory is ignored before creating worktree:**
+## Creating a Worktree
 
 ```bash
-# Check if directory is ignored (respects local, global, and system gitignore)
-git check-ignore -q .worktrees 2>/dev/null || git check-ignore -q worktrees 2>/dev/null
+# Create a new branch in a worktree (defaults to main/master as base)
+wt create <branch-name>
+
+# Create from a specific base branch
+wt create <branch-name> develop
 ```
 
-**If NOT ignored:**
+With shell integration, `wt create` automatically changes into the new worktree directory.
 
-Per Jesse's rule "Fix broken things immediately":
-1. Add appropriate line to .gitignore
-2. Commit the change
-3. Proceed with worktree creation
-
-**Why critical:** Prevents accidentally committing worktree contents to repository.
-
-### For Global Directory (~/.config/superpowers/worktrees)
-
-No .gitignore verification needed - outside project entirely.
-
-## Creation Steps
-
-### 1. Detect Project Name
+### Checkout Existing Branch
 
 ```bash
-project=$(basename "$(git rev-parse --show-toplevel)")
+# Checkout an existing branch into a worktree
+wt checkout <branch-name>
+wt co <branch-name>          # short alias
+
+# Interactive selection from available branches
+wt co
 ```
 
-### 2. Create Worktree
+### Checkout a PR or MR
 
 ```bash
-# Determine full path
-case $LOCATION in
-  .worktrees|worktrees)
-    path="$LOCATION/$BRANCH_NAME"
-    ;;
-  ~/.config/superpowers/worktrees/*)
-    path="~/.config/superpowers/worktrees/$project/$BRANCH_NAME"
-    ;;
-esac
+# GitHub PR (requires gh CLI)
+wt pr 123
+wt pr https://github.com/org/repo/pull/123
+wt pr                        # interactive selection
 
-# Create worktree with new branch
-git worktree add "$path" -b "$BRANCH_NAME"
-cd "$path"
+# GitLab MR (requires glab CLI)
+wt mr 42
+wt mr https://gitlab.com/org/repo/-/merge_requests/42
+wt mr                        # interactive selection
 ```
 
-### 3. Run Project Setup
+## Multi-Repository Tasks
 
-Auto-detect and run appropriate setup:
+When a task requires changes across multiple repositories, `wt` can group worktrees by feature instead of by repo. This keeps all related code together.
 
-```bash
-# Node.js
-if [ -f package.json ]; then npm install; fi
+### Configuration
 
-# Rust
-if [ -f Cargo.toml ]; then cargo build; fi
+Set up a custom pattern that puts the branch name first:
 
-# Python
-if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-if [ -f pyproject.toml ]; then poetry install; fi
-
-# Go
-if [ -f go.mod ]; then go mod download; fi
+```toml
+# ~/.config/wt/config.toml
+strategy = "custom"
+pattern = "{.worktreeRoot}/{.branch}/{.repo.Name}"
 ```
 
-### 4. Verify Clean Baseline
+### Workflow
 
-Run tests to ensure worktree starts clean:
+Use the same branch name in each repository:
 
 ```bash
-# Examples - use project-appropriate command
+cd ~/src/shared-lib
+wt create feat/PROJ-123
+
+cd ~/src/main-app
+wt create feat/PROJ-123
+```
+
+This produces a grouped layout:
+
+```
+~/dev/worktrees/
+  feat/PROJ-123/
+    shared-lib/
+    main-app/
+```
+
+All repos for one task are under a single directory, making cross-repo work straightforward.
+
+### Alternative: Environment Variable Grouping
+
+For tasks where branch names differ across repos, use an environment variable:
+
+```toml
+# ~/.config/wt/config.toml
+strategy = "custom"
+pattern = "{.worktreeRoot}/{.env.FEATURE}/{.repo.Name}"
+```
+
+```bash
+export FEATURE=PROJ-42-new-checkout
+
+cd ~/src/frontend
+wt create main
+
+cd ~/src/backend
+wt create main
+```
+
+Switch to a different feature by changing the variable:
+
+```bash
+export FEATURE=PROJ-99-hotfix
+```
+
+## Project Setup via Hooks
+
+Instead of manually detecting and running setup commands, configure `wt` hooks to automate dependency installation:
+
+```toml
+# ~/.config/wt/config.toml
+[hooks]
+# Copy environment files from main worktree
+post_create = ["test -f $WT_MAIN/.env && cp $WT_MAIN/.env $WT_PATH/.env || true"]
+
+# Install dependencies after creating or checking out a worktree
+post_checkout = ["cd $WT_PATH && test -f package.json && npm install || true"]
+```
+
+Hook environment variables available: `$WT_PATH`, `$WT_BRANCH`, `$WT_MAIN`, `$WT_REPO_NAME`.
+
+Common hook patterns:
+
+| Project type | Hook command |
+|-------------|-------------|
+| Node.js | `cd $WT_PATH && npm install` |
+| Python (uv) | `cd $WT_PATH && uv sync` |
+| Python (poetry) | `cd $WT_PATH && poetry install` |
+| Rust | `cd $WT_PATH && cargo build` |
+| Go | `cd $WT_PATH && go mod download` |
+
+Pre-hooks abort the operation on failure. Post-hooks warn but continue.
+
+## Verify Clean Baseline
+
+After creating the worktree, run tests to ensure a clean starting point:
+
+```bash
+# Use project-appropriate command
 npm test
 cargo test
 pytest
@@ -133,7 +179,7 @@ go test ./...
 
 **If tests pass:** Report ready.
 
-### 5. Report Location
+### Report Location
 
 ```
 Worktree ready at <full-path>
@@ -141,70 +187,109 @@ Tests passing (<N> tests, 0 failures)
 Ready to implement <feature-name>
 ```
 
+## Managing Worktrees
+
+```bash
+# List all worktrees
+wt list
+wt ls
+
+# Remove a worktree
+wt remove <branch>
+wt rm <branch>
+wt rm                        # interactive selection
+wt rm -f <branch>            # force remove (modified worktree)
+
+# Clean up worktrees for merged branches
+wt cleanup
+wt cleanup --dry-run         # preview what would be removed
+
+# Remove stale worktree administrative files
+wt prune
+```
+
 ## Quick Reference
 
 | Situation | Action |
 |-----------|--------|
-| `.worktrees/` exists | Use it (verify ignored) |
-| `worktrees/` exists | Use it (verify ignored) |
-| Both exist | Use `.worktrees/` |
-| Neither exists | Check CLAUDE.md → Ask user |
-| Directory not ignored | Add to .gitignore + commit |
+| Start new feature | `wt create <branch>` |
+| Work on existing branch | `wt checkout <branch>` or `wt co` |
+| Review a GitHub PR | `wt pr <number>` |
+| Review a GitLab MR | `wt mr <number>` |
+| Multi-repo task | Same branch name + custom pattern |
+| List worktrees | `wt list` |
+| Remove worktree | `wt remove <branch>` |
+| Clean merged branches | `wt cleanup` |
+| Check configuration | `wt info` |
 | Tests fail during baseline | Report failures + ask |
-| No package.json/Cargo.toml | Skip dependency install |
 
 ## Common Mistakes
 
-### Skipping ignore verification
+### Forgetting shell integration
 
-- **Problem:** Worktree contents get tracked, pollute git status
-- **Fix:** Always use `git check-ignore` before creating project-local worktree
+- **Problem:** No auto-cd after `wt create`, must manually navigate to worktree
+- **Fix:** Run `wt init` and restart shell. Verify with `wt info`.
 
-### Assuming directory location
+### Not configuring hooks for setup
 
-- **Problem:** Creates inconsistency, violates project conventions
-- **Fix:** Follow priority: existing > CLAUDE.md > ask
+- **Problem:** Dependencies not installed in new worktrees, tests fail due to missing packages
+- **Fix:** Add `post_create`/`post_checkout` hooks in `~/.config/wt/config.toml`
+
+### Different branch names across repos in multi-repo task
+
+- **Problem:** Worktrees for the same task scattered across different directories
+- **Fix:** Use consistent branch names, or use `{.env.FEATURE}` pattern variable
 
 ### Proceeding with failing tests
 
 - **Problem:** Can't distinguish new bugs from pre-existing issues
 - **Fix:** Report failures, get explicit permission to proceed
 
-### Hardcoding setup commands
-
-- **Problem:** Breaks on projects using different tools
-- **Fix:** Auto-detect from project files (package.json, etc.)
-
 ## Example Workflow
+
+### Single Repository
 
 ```
 You: I'm using the using-git-worktrees skill to set up an isolated workspace.
 
-[Check .worktrees/ - exists]
-[Verify ignored - git check-ignore confirms .worktrees/ is ignored]
-[Create worktree: git worktree add .worktrees/auth -b feature/auth]
-[Run npm install]
+[Run: wt create feature/auth]
+[Auto-cd to worktree]
 [Run npm test - 47 passing]
 
-Worktree ready at /Users/jesse/myproject/.worktrees/auth
+Worktree ready at ~/dev/worktrees/myproject/feature/auth
 Tests passing (47 tests, 0 failures)
 Ready to implement auth feature
+```
+
+### Multi-Repository
+
+```
+You: I'm using the using-git-worktrees skill to set up isolated workspaces
+     across multiple repositories.
+
+[Run: cd ~/src/shared-lib && wt create feat/PROJ-123]
+[Run: cd ~/src/main-app && wt create feat/PROJ-123]
+
+Worktrees ready:
+  ~/dev/worktrees/feat/PROJ-123/shared-lib/
+  ~/dev/worktrees/feat/PROJ-123/main-app/
+
+Ready to implement PROJ-123 across both repos.
 ```
 
 ## Red Flags
 
 **Never:**
-- Create worktree without verifying it's ignored (project-local)
+- Use raw `git worktree add` when `wt` is available
 - Skip baseline test verification
 - Proceed with failing tests without asking
-- Assume directory location when ambiguous
-- Skip CLAUDE.md check
+- Use different branch names across repos in a multi-repo task without `{.env.*}` grouping
 
 **Always:**
-- Follow directory priority: existing > CLAUDE.md > ask
-- Verify directory is ignored for project-local
-- Auto-detect and run project setup
-- Verify clean test baseline
+- Use `wt create` / `wt checkout` for worktree operations
+- Verify clean test baseline after creation
+- Use consistent branch names for multi-repo tasks
+- Check `wt info` if unsure about current configuration
 
 ## Integration
 
