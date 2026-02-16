@@ -2,8 +2,8 @@
   "name": "superpowers-dev",
   "description": "Development marketplace for Superpowers core skills library",
   "owner": {
-    "name": "Jesse Vincent",
-    "email": "jesse@fsck.com"
+    "name": "Tim Van Wassenhove",
+    "url": "https://github.com/timvw"
   },
   "plugins": [
     {
